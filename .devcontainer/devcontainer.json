@@ -1,0 +1,30 @@
+{
+  "name": "minecraft-codespace-panel",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17",
+      "installGradle": false,
+      "installMaven": false
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Minecraft Panel",
+      "onAutoForward": "openPreview",
+      "visibility": "private"
+    }
+  },
+  "postCreateCommand": "bash -lc 'corepack enable && corepack prepare pnpm@10.8.1 --activate && pnpm install && (command -v tmux >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y tmux)) && chmod +x .devcontainer/start-dev.sh'",
+  "postStartCommand": "bash .devcontainer/start-dev.sh"
+}
