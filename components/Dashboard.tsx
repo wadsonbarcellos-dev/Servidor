@@ -60,7 +60,14 @@ export function Dashboard() {
       setSelectedServer((current) =>
         nextServers.some((server) => server.name === current) ? current : nextServers[0].name
       );
+    } else {
+      setSelectedServer("");
     }
+  }
+
+  async function handleServerDeleted(name: string) {
+    setFeedback(`Servidor ${name} removido.`);
+    await refreshServers();
   }
 
   async function installServer(event: FormEvent<HTMLFormElement>) {
@@ -271,6 +278,7 @@ export function Dashboard() {
                   serverName={selectedServer}
                   defaultVersion={currentServer.version}
                   onFeedback={setFeedback}
+                  onServerDeleted={handleServerDeleted}
                 />
               ) : null}
 

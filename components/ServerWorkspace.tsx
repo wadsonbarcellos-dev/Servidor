@@ -6,6 +6,7 @@ type ServerWorkspaceProps = {
   serverName: string;
   defaultVersion?: string;
   onFeedback: (message: string) => void;
+  onServerDeleted: (serverName: string) => Promise<void> | void;
 };
 
 type ServerStatusResponse = {
@@ -51,7 +52,7 @@ type FileResponse = {
 type PluginSource = "hangar" | "modrinth" | "url";
 type WorkspaceTab = "overview" | "plugins" | "files";
 
-export function ServerWorkspace({ serverName, defaultVersion, onFeedback }: ServerWorkspaceProps) {
+export function ServerWorkspace({ serverName, defaultVersion, onFeedback, onServerDeleted }: ServerWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
   const [status, setStatus] = useState<ServerStatusResponse["stats"] | null>(null);
   const [plugins, setPlugins] = useState<Array<{ name: string; path: string }>>([]);
@@ -68,6 +69,7 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback }: Serv
   const [selectedFilePath, setSelectedFilePath] = useState("server.properties");
   const [selectedFileContent, setSelectedFileContent] = useState("");
   const [editorBusy, setEditorBusy] = useState(false);
+  const [isDeletingServer, setIsDeletingServer] = useState(false);
 
   useEffect(() => {
     void refreshStatus();
@@ -182,6 +184,30 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback }: Serv
     onFeedback(payload.message ?? payload.error ?? "Arquivo atualizado.");
   }
 
+  async function deleteCurrentServer() {
+    const typedName = window.prompt(`Digite o nome do servidor para confirmar a exclusao: ${serverName}`);
+    if (typedName == null) return;
+
+    if (typedName.trim() !== serverName) {
+      onFeedback("Confirmacao incorreta. Servidor nao removido.");
+      return;
+    }
+
+    setIsDeletingServer(true);
+    const response = await fetch("/api/server/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ serverName, confirmName: typedName.trim() }),
+    });
+    const payload = (await response.json()) as { ok: boolean; message?: string; error?: string };
+    setIsDeletingServer(false);
+
+    onFeedback(payload.message ?? payload.error ?? "Atualizado.");
+    if (payload.ok) {
+      await onServerDeleted(serverName);
+    }
+  }
+
   const parentPath = browserPath.includes("/")
     ? browserPath.split("/").slice(0, -1).join("/")
     : "";
@@ -245,6 +271,14 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback }: Serv
                 className="rounded border border-zinc-800 bg-black/20 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-700"
               >
                 Atualizar plugins
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteCurrentServer()}
+                disabled={isDeletingServer}
+                className="rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200 hover:bg-red-500/20 disabled:opacity-50"
+              >
+                {isDeletingServer ? "Excluindo..." : "Excluir Servidor"}
               </button>
             </div>
           </div>
