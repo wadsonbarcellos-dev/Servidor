@@ -155,14 +155,16 @@ async function resolvePaperDownloadUrl(project: "paper" | "folia", version: stri
     versions: Record<string, string[]>;
   }>(`https://fill.papermc.io/v3/projects/${project}`);
 
-  const allVersions = Object.values(projectInfo.versions).flat();
-  const targetVersion = version === "latest" ? allVersions[0] : version;
+  const allVersions = Object.values(projectInfo.versions)
+    .flat()
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
 
-  if (!targetVersion) {
+  if (allVersions.length === 0) {
     throw new Error(`Nenhuma versao disponivel para ${project}.`);
   }
 
-  const builds = await fetchJson<
+  async function getBuildForVersion(targetVersion: string) {
+    const builds = await fetchJson<
     Array<{
       id: number;
       channel: string;
@@ -172,17 +174,35 @@ async function resolvePaperDownloadUrl(project: "paper" | "folia", version: stri
         };
       };
     }>
-  >(`https://fill.papermc.io/v3/projects/${project}/versions/${targetVersion}/builds`);
+    >(`https://fill.papermc.io/v3/projects/${project}/versions/${targetVersion}/builds`);
 
-  const stableBuild = builds.find((entry) => entry.channel === "STABLE");
-  const selectedBuild = stableBuild ?? builds[0];
-  const jarUrl = selectedBuild?.downloads?.["server:default"]?.url;
+    const stableBuild = builds.find((entry) => entry.channel === "STABLE");
+    const selectedBuild = stableBuild ?? builds[0];
+    const jarUrl = selectedBuild?.downloads?.["server:default"]?.url;
 
-  if (!selectedBuild || !jarUrl) {
-    throw new Error(`Nenhum build disponivel para ${project} ${targetVersion}.`);
+    if (!selectedBuild || !jarUrl) {
+      return null;
+    }
+
+    return { version: targetVersion, build: String(selectedBuild.id), jarUrl };
   }
 
-  return { version: targetVersion, build: String(selectedBuild.id), jarUrl };
+  if (version !== "latest") {
+    const explicit = await getBuildForVersion(version);
+    if (!explicit) {
+      throw new Error(`Nenhum build disponivel para ${project} ${version}.`);
+    }
+    return explicit;
+  }
+
+  for (const candidate of allVersions) {
+    const resolved = await getBuildForVersion(candidate);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  throw new Error(`Nenhum build estavel disponivel para ${project}.`);
 }
 
 async function resolvePurpurDownloadUrl(version: string) {
