@@ -10,5 +10,5 @@ dist
 .logs
 .tmp
 .codespaces
-server
+/server
 pnpm.exe
