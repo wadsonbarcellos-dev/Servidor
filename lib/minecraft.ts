@@ -4,7 +4,7 @@ export const MC_SERVER_ROOT = process.env.MC_SERVER_ROOT || path.join(process.cw
 export const MC_USER_AGENT =
   process.env.MC_USER_AGENT || "minecraft-control-panel/0.1.0 (https://github.com/codespaces)";
 
-export type ServerSoftware = "vanilla" | "paper" | "purpur" | "spigot" | "custom";
+export type ServerSoftware = "vanilla" | "paper" | "purpur" | "spigot" | "bedrock" | "forge" | "fabric" | "quilt" | "custom";
 
 export type ServerMetadata = {
   name: string;
@@ -19,8 +19,9 @@ export function getServerDir(serverName: string) {
   return path.join(MC_SERVER_ROOT, serverName);
 }
 
-export function getServerJar(serverName: string) {
-  return path.join(getServerDir(serverName), "server.jar");
+export function getServerJar(serverName: string, software?: string) {
+  const filename = software === "bedrock" ? "bedrock_server" : "server.jar";
+  return path.join(getServerDir(serverName), filename);
 }
 
 export function getLatestLog(serverName: string) {

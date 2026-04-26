@@ -1,34 +1,11 @@
 import { promises as fs } from "fs";
-import { spawn } from "child_process";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerMetadataPath, getSessionName, ServerMetadata } from "@/lib/minecraft";
 import { resolveServerPath } from "@/lib/server-fs";
+import { runBash } from "@/lib/shell";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function runBash(command: string) {
-  return new Promise<{ code: number; stdout: string; stderr: string }>((resolve, reject) => {
-    const child = spawn("bash", ["-lc", command], {
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", reject);
-    child.on("close", (code) => resolve({ code: code ?? 0, stdout: stdout.trim(), stderr: stderr.trim() }));
-  });
-}
 
 async function readMetadata(serverName: string): Promise<ServerMetadata | null> {
   try {
@@ -58,8 +35,19 @@ async function getProcessStats(serverName: string) {
     `PID=$(pgrep -f ${JSON.stringify(`${serverDir}.*server.jar`)} | head -n 1); if [ -n "$PID" ]; then ps -p "$PID" -o pid=,%cpu=,rss=,etime=,comm=; fi`
   );
 
+  // Verificar se o playit está rodando
+  const playitSessionName = `playit-${serverName.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  let playitRunning = false;
+  if (mode !== "none") {
+    if (mode === "tmux") {
+      playitRunning = (await runBash(`tmux has-session -t ${playitSessionName}`)).code === 0;
+    } else {
+      playitRunning = (await runBash(`screen -list | grep -q "[.]${playitSessionName}[[:space:]]"`)).code === 0;
+    }
+  }
+
   if (!processQuery.stdout) {
-    return { running, mode, pid: null, cpu: null, memoryMb: null, uptime: null, command: null };
+    return { running, mode, pid: null, cpu: null, memoryMb: null, uptime: null, command: null, playitRunning };
   }
 
   const parts = processQuery.stdout.trim().split(/\s+/);
@@ -73,6 +61,7 @@ async function getProcessStats(serverName: string) {
     memoryMb: rss ? Math.round(Number(rss) / 1024) : null,
     uptime: uptime ?? null,
     command: commandParts.join(" ") || null,
+    playitRunning,
   };
 }
 
@@ -92,4 +81,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
-

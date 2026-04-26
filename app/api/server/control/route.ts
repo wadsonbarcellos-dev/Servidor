@@ -1,172 +1,98 @@
 import { promises as fs } from "fs";
-import { spawn } from "child_process";
+import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerDir, getServerJar, getSessionName } from "@/lib/minecraft";
+import { runBash, shellQuote } from "@/lib/shell";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type ControlAction = "start" | "stop" | "command" | "status";
-
-function runBash(command: string) {
-  return new Promise<{ code: number; stdout: string; stderr: string }>((resolve, reject) => {
-    const child = spawn("bash", ["-lc", command], {
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", reject);
-    child.on("close", (code) => resolve({ code: code ?? 0, stdout: stdout.trim(), stderr: stderr.trim() }));
-  });
-}
-
-async function sessionMode() {
-  const tmuxCheck = await runBash("command -v tmux >/dev/null 2>&1");
-  if (tmuxCheck.code === 0) return "tmux" as const;
-
-  const screenCheck = await runBash("command -v screen >/dev/null 2>&1");
-  if (screenCheck.code === 0) return "screen" as const;
-
-  throw new Error("Nem tmux nem screen estao disponiveis no container.");
-}
-
 async function sessionIsRunning(mode: "tmux" | "screen", sessionName: string) {
-  if (mode === "tmux") {
-    const result = await runBash(`tmux has-session -t ${sessionName}`);
-    return result.code === 0;
-  }
-
-  const result = await runBash(`screen -list | grep -q "[.]${sessionName}[[:space:]]"`);
+  const command = mode === "tmux" ? `tmux has-session -t ${sessionName}` : `screen -ls | grep -q "\\.${sessionName}"`;
+  const result = await runBash(command);
   return result.code === 0;
-}
-
-function shellQuote(value: string) {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as {
-      action?: ControlAction;
-      serverName?: string;
-      command?: string;
-      memory?: string;
-    };
+    const body = await request.json();
+    const { serverName, action, memory = "2G", mode = "tmux" } = body;
 
-    const action = body.action ?? "status";
-    const serverName = body.serverName?.trim() || "survival";
-    const memory = body.memory?.trim() || "2G";
-    const serverDir = getServerDir(serverName);
-    const serverJar = getServerJar(serverName);
-    const sessionName = getSessionName(serverName);
-    const mode = await sessionMode();
-
-    if (action === "status") {
-      return NextResponse.json({ ok: true, running: await sessionIsRunning(mode, sessionName), mode, serverDir });
+    if (!serverName || !action) {
+      return NextResponse.json({ ok: false, error: "Informe serverName e action." }, { status: 400 });
     }
 
-    await fs.mkdir(serverDir, { recursive: true });
+    const sessionName = getSessionName(serverName);
+    const serverDir = getServerDir(serverName);
+    const serverJar = getServerJar(serverName);
 
     if (action === "start") {
-      await fs.access(serverJar);
-
       if (await sessionIsRunning(mode, sessionName)) {
-        return NextResponse.json({ ok: true, running: true, mode, message: "Servidor ja esta em execucao." });
+        return NextResponse.json({ ok: true, running: true, message: "Servidor já está em execução." });
       }
 
-      const launch = [
-        "cd",
-        shellQuote(serverDir),
-        "&&",
-        "mkdir -p logs",
-        "&&",
-        "touch eula.txt",
-        "&&",
-        `printf 'eula=true\\n' > eula.txt`,
-        "&&",
-        `java -Xmx${memory} -jar server.jar nogui`,
-      ].join(" ");
+      const isBedrock = serverJar.endsWith("bedrock_server");
+      let launch;
 
-      const command =
-        mode === "tmux"
-          ? `tmux new-session -d -s ${sessionName} ${shellQuote(launch)}`
-          : `screen -dmS ${sessionName} bash -lc ${shellQuote(launch)}`;
+      if (isBedrock) {
+        launch = [
+          "cd", shellQuote(serverDir),
+          "&&", "chmod +x bedrock_server",
+          "&&", "LD_LIBRARY_PATH=. ./bedrock_server"
+        ].join(" ");
+      } else {
+        // Aikar's Flags para Otimização Profissional de RAM
+        const aikarFlags = [
+          "-XX:+UseG1GC",
+          "-XX:+ParallelRefProcEnabled",
+          "-XX:MaxGCPauseMillis=200",
+          "-XX:+UnlockExperimentalVMOptions",
+          "-XX:+DisableExplicitGC",
+          "-XX:+AlwaysPreTouch",
+          "-XX:G1NewSizePercent=30",
+          "-XX:G1MaxNewSizePercent=40",
+          "-XX:G1HeapRegionSize=8M",
+          "-XX:G1ReservePercent=20",
+          "-XX:G1HeapWastePercent=5",
+          "-XX:G1MixedGCCountTarget=4",
+          "-XX:InitiatingHeapOccupancyPercent=15",
+          "-XX:G1MixedGCLiveThresholdPercent=90",
+          "-XX:G1RSetUpdatingPauseTimePercent=5",
+          "-XX:SurvivorRatio=32",
+          "-XX:+PerfDisableSharedMem",
+          "-XX:MaxTenuringThreshold=1"
+        ].join(" ");
+
+        launch = [
+          "cd", shellQuote(serverDir),
+          "&&", "echo 'eula=true' > eula.txt",
+          "&&", `java -Xms128M -Xmx${memory} ${aikarFlags} -jar server.jar nogui`
+        ].join(" ");
+      }
+
+      // Iniciar Playit.gg em segundo plano se disponível
+      const playitCommand = "tmux new-session -d -s playit-tunnel 'playit'";
+      await runBash(playitCommand);
+
+      const command = mode === "tmux" 
+        ? `tmux new-session -d -s ${sessionName} ${shellQuote(launch)}`
+        : `screen -dmS ${sessionName} bash -c ${shellQuote(launch)}`;
 
       const result = await runBash(command);
+      if (result.code !== 0) throw new Error(result.stderr || "Falha ao iniciar sessão.");
 
-      if (result.code !== 0) {
-        return NextResponse.json(
-          { ok: false, error: result.stderr || "Falha ao iniciar o servidor.", mode },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({ ok: true, running: true, mode, message: "Servidor iniciado em background." });
+      return NextResponse.json({ ok: true, message: "Servidor e Playit iniciados!" });
     }
 
     if (action === "stop") {
-      if (!(await sessionIsRunning(mode, sessionName))) {
-        return NextResponse.json({ ok: true, running: false, mode, message: "Servidor ja estava parado." });
-      }
-
-      const command =
-        mode === "tmux"
-          ? `tmux send-keys -t ${sessionName} "stop" Enter`
-          : `screen -S ${sessionName} -X stuff "stop^M"`;
-
-      const result = await runBash(command);
-
-      if (result.code !== 0) {
-        return NextResponse.json(
-          { ok: false, error: result.stderr || "Falha ao enviar stop.", mode },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({ ok: true, running: false, mode, message: "Comando stop enviado." });
+      const command = mode === "tmux" ? `tmux kill-session -t ${sessionName}` : `screen -S ${sessionName} -X quit`;
+      await runBash(command);
+      await runBash("tmux kill-session -t playit-tunnel 2>/dev/null");
+      return NextResponse.json({ ok: true, message: "Servidor e túnel encerrados." });
     }
 
-    if (action === "command") {
-      if (!body.command?.trim()) {
-        return NextResponse.json({ ok: false, error: "Informe um comando." }, { status: 400 });
-      }
-
-      if (!(await sessionIsRunning(mode, sessionName))) {
-        return NextResponse.json({ ok: false, error: "Servidor nao esta rodando.", mode }, { status: 409 });
-      }
-
-      const input = body.command.trim().replaceAll('"', '\\"');
-      const command =
-        mode === "tmux"
-          ? `tmux send-keys -t ${sessionName} "${input}" Enter`
-          : `screen -S ${sessionName} -X stuff "${input}^M"`;
-
-      const result = await runBash(command);
-
-      if (result.code !== 0) {
-        return NextResponse.json(
-          { ok: false, error: result.stderr || "Falha ao enviar comando.", mode },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({ ok: true, mode, message: "Comando enviado ao console." });
-    }
-
-    return NextResponse.json({ ok: false, error: "Acao invalida." }, { status: 400 });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro inesperado ao controlar o servidor.";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Ação inválida." }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }

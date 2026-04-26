@@ -24,6 +24,7 @@ type ServerStatusResponse = {
     memoryMb: number | null;
     uptime: string | null;
     command: string | null;
+    playitRunning?: boolean;
   };
 };
 
@@ -214,43 +215,50 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback, onServ
 
   return (
     <section className="space-y-6">
-      <div className="rounded-lg border border-emerald-500/20 bg-panel-950/80 p-4 shadow-glow backdrop-blur">
-        <div className="flex flex-wrap gap-2">
-          {(["overview", "plugins", "files"] as WorkspaceTab[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`rounded border px-3 py-2 text-sm transition ${
-                activeTab === tab
-                  ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
-                  : "border-zinc-800 bg-black/20 text-zinc-400 hover:border-zinc-700"
-              }`}
-            >
-              {tab === "overview" ? "Visao Geral" : tab === "plugins" ? "Plugins" : "Arquivos"}
-            </button>
-          ))}
-        </div>
+      <div className="creeper-glass rounded-2xl p-2 flex gap-2">
+        {(["overview", "plugins", "files"] as WorkspaceTab[]).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-2.5 text-sm font-bold uppercase tracking-widest rounded-xl transition-all ${
+              activeTab === tab
+                ? "bg-emerald-500 text-emerald-950 shadow-lg"
+                : "text-emerald-500/60 hover:bg-emerald-500/10"
+            }`}
+          >
+            {tab === "overview" ? "Visão Geral" : tab === "plugins" ? "Plugins" : "Arquivos"}
+          </button>
+        ))}
       </div>
 
       {activeTab === "overview" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <StatCard label="Status" value={status?.running ? "Running" : "Stopped"} accent={status?.running} />
-          <StatCard label="Modo" value={status?.mode || "-"} />
-          <StatCard label="PID" value={status?.pid || "-"} />
+          <StatCard label="Status" value={status?.running ? "Online" : "Offline"} accent={status?.running} />
+          <StatCard label="Playit.gg" value={status?.playitRunning ? "Ativo" : "Inativo"} accent={status?.playitRunning} />
           <StatCard label="CPU" value={status?.cpu != null ? `${status.cpu}%` : "-"} />
           <StatCard label="RAM" value={status?.memoryMb != null ? `${status.memoryMb} MB` : "-"} />
-          <div className="rounded-lg border border-emerald-500/20 bg-panel-950/80 p-4 shadow-glow backdrop-blur md:col-span-2 xl:col-span-5">
-            <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">Uptime</p>
-            <p className="mt-2 text-sm text-zinc-300">{status?.uptime || "sem processo java ativo"}</p>
-            <p className="mt-4 text-xs uppercase tracking-[0.25em] text-zinc-500">Atalhos</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+          <StatCard label="PID" value={status?.pid || "-"} />
+          
+          <div className="creeper-glass rounded-2xl p-6 md:col-span-2 xl:col-span-5">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-emerald-500/60">Tempo de Atividade</p>
+                <p className="mt-1 text-lg font-mono text-emerald-100">{status?.uptime || "Servidor parado"}</p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                <div className={`h-3 w-3 rounded-full ${status?.running ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-700'}`} />
+              </div>
+            </div>
+
+            <p className="text-xs font-bold uppercase tracking-widest text-emerald-500/60 mb-4">Ações Rápidas</p>
+            <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => void loadFile("server.properties")}
-                className="rounded border border-zinc-800 bg-black/20 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-700"
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-900/40 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/60 transition-all"
               >
-                Abrir server.properties
+                Configurações
               </button>
               <button
                 type="button"
@@ -258,28 +266,25 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback, onServ
                   setActiveTab("files");
                   void openPath("plugins");
                 }}
-                className="rounded border border-zinc-800 bg-black/20 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-700"
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-900/40 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/60 transition-all"
               >
-                Abrir pasta plugins
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab("plugins");
-                  void refreshPlugins();
-                }}
-                className="rounded border border-zinc-800 bg-black/20 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-700"
-              >
-                Atualizar plugins
+                Pasta Plugins
               </button>
               <button
                 type="button"
                 onClick={() => void deleteCurrentServer()}
                 disabled={isDeletingServer}
-                className="rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200 hover:bg-red-500/20 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-red-900/20 text-red-400 border border-red-500/20 hover:bg-red-900/40 transition-all disabled:opacity-50"
               >
                 {isDeletingServer ? "Excluindo..." : "Excluir Servidor"}
               </button>
+            </div>
+            
+            <div className="mt-6 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500/40 mb-2">Dica de Otimização</p>
+              <p className="text-xs text-emerald-100/70 leading-relaxed">
+                O servidor está usando <strong>Aikar's Flags</strong> e <strong>G1GC</strong> para minimizar o uso de RAM e evitar travamentos.
+              </p>
             </div>
           </div>
         </div>
@@ -289,122 +294,66 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback, onServ
         <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
           <form
             onSubmit={installPlugin}
-            className="rounded-lg border border-emerald-500/20 bg-panel-950/80 p-4 shadow-glow backdrop-blur"
+            className="creeper-glass rounded-2xl p-6"
           >
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-300">Instalar Plugin</p>
-            <div className="mt-4 flex gap-2">
+            <p className="text-sm font-bold uppercase tracking-widest text-emerald-400 mb-6">Instalar Plugin</p>
+            <div className="flex gap-2 mb-6">
               {(["hangar", "modrinth", "url"] as PluginSource[]).map((source) => (
                 <button
                   key={source}
                   type="button"
                   onClick={() => setPluginSource(source)}
-                  className={`rounded border px-3 py-2 text-sm ${
+                  className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-all ${
                     pluginSource === source
-                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
-                      : "border-zinc-800 bg-black/20 text-zinc-400"
+                      ? "bg-emerald-500 text-emerald-950"
+                      : "bg-emerald-950/40 text-emerald-500/60 hover:bg-emerald-950/60"
                   }`}
                 >
-                  {source === "url" ? "URL" : source === "modrinth" ? "Modrinth" : "Hangar"}
+                  {source}
                 </button>
               ))}
             </div>
-
-            <div className="mt-4 space-y-4">
-              {pluginSource === "hangar" ? (
+            
+            <div className="space-y-4">
+              {pluginSource === "hangar" && (
                 <>
-                  <Field label="Autor">
-                    <input
-                      value={pluginAuthor}
-                      onChange={(event) => setPluginAuthor(event.target.value)}
-                      className={inputClass}
-                      placeholder="EssentialsX"
-                    />
-                  </Field>
-                  <Field label="Projeto">
-                    <input
-                      value={pluginProject}
-                      onChange={(event) => setPluginProject(event.target.value)}
-                      className={inputClass}
-                      placeholder="Essentials"
-                    />
-                  </Field>
-                  <Field label="Versao">
-                    <input
-                      value={pluginVersion}
-                      onChange={(event) => setPluginVersion(event.target.value)}
-                      className={inputClass}
-                      placeholder="vazio = mais recente"
-                    />
-                  </Field>
+                  <Field label="Autor"><input value={pluginAuthor} onChange={e => setPluginAuthor(e.target.value)} className={inputClass} /></Field>
+                  <Field label="Projeto"><input value={pluginProject} onChange={e => setPluginProject(e.target.value)} className={inputClass} /></Field>
                 </>
-              ) : null}
-
-              {pluginSource === "modrinth" ? (
-                <Field label="Projeto Modrinth">
-                  <input
-                    value={pluginProjectId}
-                    onChange={(event) => setPluginProjectId(event.target.value)}
-                    className={inputClass}
-                    placeholder="luckperms"
-                  />
-                </Field>
-              ) : null}
-
-              {pluginSource === "url" ? (
-                <>
-                  <Field label="URL">
-                    <input
-                      value={pluginUrl}
-                      onChange={(event) => setPluginUrl(event.target.value)}
-                      className={inputClass}
-                      placeholder="https://..."
-                    />
-                  </Field>
-                  <Field label="Nome do arquivo">
-                    <input
-                      value={pluginFilename}
-                      onChange={(event) => setPluginFilename(event.target.value)}
-                      className={inputClass}
-                      placeholder="plugin.jar"
-                    />
-                  </Field>
-                </>
-              ) : null}
+              )}
+              {pluginSource === "modrinth" && (
+                <Field label="ID do Projeto"><input value={pluginProjectId} onChange={e => setPluginProjectId(e.target.value)} className={inputClass} /></Field>
+              )}
+              {pluginSource === "url" && (
+                <Field label="URL Direta"><input value={pluginUrl} onChange={e => setPluginUrl(e.target.value)} className={inputClass} /></Field>
+              )}
             </div>
 
             <button
               type="submit"
               disabled={pluginBusy}
-              className="mt-4 w-full rounded border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
+              className="mt-6 w-full py-3 bg-emerald-500 text-emerald-950 font-bold uppercase rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50"
             >
-              {pluginBusy ? "Baixando..." : "Instalar Plugin"}
+              {pluginBusy ? "Instalando..." : "Instalar Plugin"}
             </button>
           </form>
 
-          <div className="rounded-lg border border-emerald-500/20 bg-panel-950/80 p-4 shadow-glow backdrop-blur">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-300">Plugins Instalados</p>
-              <button
-                type="button"
-                onClick={() => void refreshPlugins()}
-                className="rounded border border-zinc-800 bg-black/20 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-700"
-              >
-                Atualizar
-              </button>
+          <div className="creeper-glass rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-sm font-bold uppercase tracking-widest text-emerald-400">Plugins Ativos</p>
+              <button onClick={() => void refreshPlugins()} className="text-xs font-bold text-emerald-500 hover:text-emerald-400">Atualizar</button>
             </div>
-
-            <div className="mt-4 space-y-2">
+            <div className="grid gap-3">
               {plugins.length === 0 ? (
-                <div className="rounded border border-dashed border-zinc-800 bg-black/20 p-4 text-sm text-zinc-500">
-                  Nenhum plugin em `plugins/`.
-                </div>
-              ) : null}
-              {plugins.map((plugin) => (
-                <div key={plugin.path} className="rounded border border-zinc-800 bg-black/20 p-3">
-                  <p className="text-sm font-semibold text-zinc-100">{plugin.name}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{plugin.path}</p>
-                </div>
-              ))}
+                <div className="py-12 text-center text-emerald-500/30 font-mono text-sm">Nenhum plugin encontrado</div>
+              ) : (
+                plugins.map((plugin) => (
+                  <div key={plugin.path} className="bg-emerald-950/30 border border-emerald-500/10 rounded-xl p-4 flex items-center justify-between">
+                    <span className="text-sm font-bold text-emerald-100">{plugin.name}</span>
+                    <span className="text-[10px] font-mono text-emerald-500/50">.jar</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -412,37 +361,20 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback, onServ
 
       {activeTab === "files" ? (
         <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="rounded-lg border border-emerald-500/20 bg-panel-950/80 p-4 shadow-glow backdrop-blur">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-300">Arquivos</p>
-                <p className="text-xs text-zinc-500">/{browserPath || "."}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void openPath(parentPath)}
-                className="rounded border border-zinc-800 bg-black/20 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-700"
-              >
-                Voltar
-              </button>
+          <div className="creeper-glass rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-sm font-bold uppercase tracking-widest text-emerald-400">Arquivos</p>
+              <button onClick={() => void openPath(parentPath)} className="text-xs font-bold text-emerald-500">Voltar</button>
             </div>
-
-            <div className="mt-4 space-y-2">
+            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
               {fileEntries.map((entry) => (
                 <button
                   key={entry.path}
-                  type="button"
-                  onClick={() => {
-                    if (entry.type === "directory") {
-                      void openPath(entry.path);
-                      return;
-                    }
-                    void loadFile(entry.path);
-                  }}
-                  className="flex w-full items-center justify-between rounded border border-zinc-800 bg-black/20 px-3 py-3 text-left hover:border-zinc-700"
+                  onClick={() => entry.type === "directory" ? void openPath(entry.path) : void loadFile(entry.path)}
+                  className="w-full flex items-center justify-between p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/5 hover:border-emerald-500/30 transition-all"
                 >
-                  <span className="text-sm text-zinc-200">{entry.name}</span>
-                  <span className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+                  <span className="text-sm text-emerald-100 truncate">{entry.name}</span>
+                  <span className={`text-[10px] font-bold uppercase ${entry.type === 'directory' ? 'text-emerald-500' : 'text-emerald-500/30'}`}>
                     {entry.type === "directory" ? "dir" : "file"}
                   </span>
                 </button>
@@ -450,26 +382,21 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback, onServ
             </div>
           </div>
 
-          <div className="rounded-lg border border-emerald-500/20 bg-panel-950/80 p-4 shadow-glow backdrop-blur">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-300">Editor</p>
-                <p className="text-xs text-zinc-500">{selectedFilePath}</p>
-              </div>
+          <div className="creeper-glass rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-mono text-emerald-500/60 truncate">{selectedFilePath}</p>
               <button
-                type="button"
                 onClick={() => void saveSelectedFile()}
                 disabled={editorBusy}
-                className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+                className="px-6 py-2 bg-emerald-500 text-emerald-950 font-bold uppercase text-xs rounded-lg hover:bg-emerald-400 disabled:opacity-50"
               >
                 {editorBusy ? "Salvando..." : "Salvar"}
               </button>
             </div>
-
             <textarea
               value={selectedFileContent}
-              onChange={(event) => setSelectedFileContent(event.target.value)}
-              className="mt-4 h-[520px] w-full rounded border border-zinc-800 bg-black px-4 py-4 font-mono text-sm leading-6 text-zinc-200 outline-none focus:border-emerald-500/40"
+              onChange={(e) => setSelectedFileContent(e.target.value)}
+              className="w-full h-[500px] bg-black/40 border border-emerald-500/10 rounded-xl p-4 font-mono text-sm text-emerald-100 outline-none focus:border-emerald-500/30 transition-all"
               spellCheck={false}
             />
           </div>
@@ -481,9 +408,11 @@ export function ServerWorkspace({ serverName, defaultVersion, onFeedback, onServ
 
 function StatCard({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="rounded-lg border border-emerald-500/20 bg-panel-950/80 p-4 shadow-glow backdrop-blur">
-      <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">{label}</p>
-      <p className={`mt-2 text-xl font-semibold ${accent ? "text-emerald-300" : "text-zinc-100"}`}>{value}</p>
+    <div className="creeper-glass rounded-2xl p-5 flex flex-col items-center text-center">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500/50 mb-2">{label}</p>
+      <p className={`text-xl font-black ${accent ? "text-emerald-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.4)]" : "text-emerald-100"}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -491,11 +420,10 @@ function StatCard({ label, value, accent = false }: { label: string; value: stri
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs uppercase tracking-[0.25em] text-zinc-500">{label}</span>
+      <span className="block text-[10px] font-bold uppercase tracking-widest text-emerald-500/50 mb-2 ml-1">{label}</span>
       {children}
     </label>
   );
 }
 
-const inputClass =
-  "w-full rounded border border-zinc-800 bg-black/20 px-3 py-3 text-sm text-zinc-100 outline-none transition focus:border-emerald-500/40";
+const inputClass = "w-full bg-black/40 border border-emerald-500/10 rounded-xl px-4 py-3 text-sm text-emerald-100 outline-none focus:border-emerald-500/40 transition-all";

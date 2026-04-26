@@ -1,30 +1,35 @@
 {
-  "name": "minecraft-codespace-panel",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
+  "name": "Creeper Panel Professional",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
   "features": {
     "ghcr.io/devcontainers/features/java:1": {
-      "version": "17",
-      "installGradle": false,
-      "installMaven": false
+      "version": "21",
+      "jdkDistro": "temurin"
     }
   },
   "customizations": {
     "vscode": {
       "extensions": [
-        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "dbaeumer.vscode-eslint"
+        "bradlc.vscode-tailwindcss"
       ]
     }
   },
-  "forwardPorts": [3000],
+  "forwardPorts": [3000, 25565, 19132],
   "portsAttributes": {
     "3000": {
-      "label": "Minecraft Panel",
-      "onAutoForward": "openPreview",
-      "visibility": "private"
+      "label": "Painel Creeper",
+      "onAutoForward": "openPreview"
+    },
+    "25565": {
+      "label": "Minecraft Java"
+    },
+    "19132": {
+      "label": "Minecraft Bedrock"
     }
   },
-  "postCreateCommand": "bash -lc 'corepack enable && corepack prepare pnpm@10.8.1 --activate && pnpm install && (command -v tmux >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y tmux)) && chmod +x .devcontainer/start-dev.sh'",
-  "postStartCommand": "bash .devcontainer/start-dev.sh"
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y tmux screen unzip && corepack enable && pnpm install && chmod +x scripts/*.sh",
+  "postStartCommand": "./scripts/start-panel.sh",
+  "remoteUser": "node"
 }
