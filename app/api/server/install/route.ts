@@ -241,7 +241,7 @@ async function downloadJar(jarUrl: string, destination: string) {
     'echo "curl ou wget nao encontrado" >&2',
     "exit 1",
     "fi",
-  ].join(" ");
+  ].join("\n");
 
   const result = await runBash(downloadCommand);
 
